@@ -1,0 +1,111 @@
+# Combined dataset — README
+
+This README documents the combined CSV file that aggregates sensor data exported from the 2024-3600 dataset and saved in this folder.
+
+File created: combined.csv
+Location: `c:/Users/dusza/Documents/Studia/pracownia_analizy/Data/combined.csv`
+
+Summary
+-------
+- Source files combined (all matched header):
+  - `2024-3600-Internal Humidity.csv`
+  - `2024-3600-Internal Temperature.csv`
+  - `2024-3600-Journey Time.csv`
+  - `2024-3600-Plates In.csv`
+  - `2024-3600-Plates Matching.csv`
+  - `2024-3600-Plates Out.csv`
+  - `2024-3600-Sound.csv`
+  - `2024-3600-Walking.csv`
+
+- All eight files shared the same header and were concatenated into `combined.csv`.
+
+Columns (header)
+----------------
+The combined file contains the following columns (order preserved):
+
+1. `Sensor Name` — sensor identifier (string)
+2. `Variable` — measured variable name (string)
+3. `Units` — units for the reported values (string)
+4. `Start Datetime` — aggregation start (timestamp; string/ISO)
+5. `End Datetime` — aggregation end (timestamp; string/ISO)
+6. `Mean Value` — aggregated mean (numeric/float)
+7. `Min Value` — aggregated minimum (numeric/float)
+8. `Max Value` — aggregated maximum (numeric/float)
+9. `Median Value` — aggregated median (numeric/float)
+10. `Standard Dev` — standard deviation (numeric/float)
+11. `Count Records` — number of raw records used to compute aggregation (integer)
+12. `Location (WKT)` — geometry as WKT (POINT lon lat) (string)
+13. `Ground Height Above Sea Level` — numeric (nullable)
+14. `Sensor Height Above Ground` — numeric (nullable)
+15. `Broker Name` — source/broker label (string)
+16. `Sensor Centroid Longitude` — float (longitude)
+17. `Sensor Centroid Latitude` — float (latitude)
+18. `Raw ID` — raw sensor ID (integer-like or string)
+
+Notes about column types and quality
+-----------------------------------
+- Date/time columns are stored as text in the source CSVs. Convert them to datetime on load (see example below).
+- `Raw ID` may be numeric or string depending on the source; treat as string if you want to preserve leading zeros or mixed formats.
+- Some numeric columns may contain missing entries — treat missing values appropriately (NaN).
+- `Location (WKT)` is a textual WKT representation (e.g., `POINT(-1.625703 54.973379)`). Longitude/latitude columns are also present and are numeric.
+
+Recommended cleaning / validation steps
+-------------------------------------
+1. Verify headers before loading: ensure the columns are present and in expected order.
+2. Parse `Start Datetime` and `End Datetime` to pandas datetime with timezone handling if needed.
+3. Cast numeric columns (`Mean Value`, `Min Value`, `Max Value`, `Median Value`, `Standard Dev`, `Sensor Centroid Longitude`, `Sensor Centroid Latitude`, `Count Records`) to numeric types (use `pd.to_numeric(..., errors='coerce')`).
+4. Check duplicates by `Raw ID` and/or by (`Sensor Name`, `Start Datetime`, `End Datetime`). Decide whether to aggregate or drop duplicates.
+5. Validate WKT coordinates vs numeric centroid columns: ensure longitude/latitude correspond to the WKT point.
+6. Drop or flag records where `Count Records` is zero or where required fields are missing.
+
+Quick usage examples (pandas)
+----------------------------
+Load file and parse dates:
+
+```python
+import pandas as pd
+
+path = r"c:/Users/dusza/Documents/Studia/pracownia_analizy/Data/combined.csv"
+df = pd.read_csv(path, parse_dates=["Start Datetime", "End Datetime"], dayfirst=False)
+
+# Convert numeric columns safely
+num_cols = ["Mean Value", "Min Value", "Max Value", "Median Value", "Standard Dev", "Sensor Centroid Longitude", "Sensor Centroid Latitude", "Count Records"]
+for c in num_cols:
+    df[c] = pd.to_numeric(df[c], errors="coerce")
+
+# Example: drop rows missing both centroid coords
+df = df.dropna(subset=["Sensor Centroid Longitude", "Sensor Centroid Latitude"], how="all")
+
+print(df.info())
+print(df.head())
+```
+
+Create a GeoDataFrame (optional, requires geopandas)
+
+```python
+import geopandas as gpd
+from shapely import wkt
+
+gdf = df.copy()
+gdf["geometry"] = gdf["Location (WKT)"].apply(wkt.loads)
+gdf = gpd.GeoDataFrame(gdf, geometry="geometry", crs="EPSG:4326")
+```
+
+Data provenance & processing
+-----------------------------
+- The eight CSVs listed above were concatenated because they shared an identical header. No automatic column mapping or type coercion was applied during concatenation; the README lists recommended post-processing steps.
+- Rows with incompatible headers were excluded by the concatenation script. If you want to merge files with similar but non-identical headers, run a mapping step first (e.g., map `Raw ID` vs `RawID`, `Sensor Name` vs `sensor_name`).
+
+Output files produced by the processing script (if present)
+-------------------------------------------------------
+- `combined.csv` — concatenated data (this file)
+- `combined_report.txt` — text report with basic statistics (if generated by the pipeline)
+
+Contact / Authoring
+-------------------
+Generated on: 2025-11-05
+If you need changes (column mapping, additional validation rules, or geospatial conversion), update the processing notebook (`main.ipynb`) or open an issue in the project repository.
+
+License
+-------
+This README and the processing code are released for internal use. Check original data licenses before public distribution.
