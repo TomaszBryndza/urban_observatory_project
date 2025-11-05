@@ -19,7 +19,7 @@ Summary
   - `2024-3600-Sound.csv`
   - `2024-3600-Walking.csv`
 
-- All eight files shared the same header and were concatenated into `combined.csv`.
+- All eight files shared the same header and were concatenated into two files (due to gihub file size limits)`.
 
 Columns (header)
 ----------------
